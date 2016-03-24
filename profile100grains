@@ -1,0 +1,95 @@
+Total time: 2146.28 s
+File: main.py
+Function: main at line 43
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    43                                           @profile
+    44                                           def main():
+    45                                               """Main script"""
+    46                                               # My parser
+    47         1         4577   4577.0      0.0      parser = myparser()
+    48                                               # If no arguments are given show help
+    49         1            3      3.0      0.0      if len(sys.argv)==1:
+    50                                                   parser.print_help()
+    51                                                   sys.exit(1)
+    52                                           
+    53                                               # Parse arguments described above
+    54         1         2665   2665.0      0.0      args = parser.parse_args()
+    55                                           
+    56         1            2      2.0      0.0      n = args.num_grains                 # Number of grains
+    57         1            2      2.0      0.0      rand_seed = args.random_seed        # Random seed
+    58         1            3      3.0      0.0      domain_size = args.domain_size      # Domain size
+    59         1            2      2.0      0.0      nint = args.interior_points         # Number of interior points
+    60         1            4      4.0      0.0      gr.dt = args.delta_t                # Delta t (dt)
+    61         1            3      3.0      0.0      gr.npoints = nint + 2               # Set total number of points per boundary
+    62         1            3      3.0      0.0      gr.orig_dt = args.delta_t           # Original delta t (a copy of dt given in first place)
+    63         1            2      2.0      0.0      MAX_TIME = args.time_limit          # Time limit for simulation
+    64         1            3      3.0      0.0      if args.a < 0 or args.a > 1:
+    65                                                   print "Error: alpha must be a value between 0 and 1"
+    66                                                   return -1
+    67         1            2      2.0      0.0      if args.k < 0:
+    68                                                   print "Error: kappa must be a positive value"
+    69                                                   return -1
+    70         1            2      2.0      0.0      gr.mu = args.k * args.a             # IP mobility
+    71         1            3      3.0      0.0      gr.lbda = args.k * (1.0 - args.a)   # TJ mobility
+    72         1            1      1.0      0.0      show = args.show                    # Show simulation
+    73                                           
+    74                                               # If a Grain Structure file is given, get
+    75         1            2      2.0      0.0      if args.data:
+    76                                                   print "Loading condition from file", args.data
+    77                                                   GS, BD = gr.load_grains(args.data)
+    78                                               # Otherwise create initial condition
+    79                                               else:
+    80         1           22     22.0      0.0          print "Creating initial condition"
+    81         1       170976 170976.0      0.0          GS, BD = gr.create_grains(n, rand_seed, domain_size, nint)
+    82                                               # Create simulator for graphics
+    83         1            3      3.0      0.0      if show:
+    84                                                   sim = Simulator(__version__, gr.mu, gr.lbda, args.k, "STREAM")
+    85                                               # Current iteration
+    86         1            2      2.0      0.0      curr_iter = 1
+    87                                               # Elapsed time for simulation (sum of dt's)
+    88         1            2      2.0      0.0      elapsed_time = 0.0
+    89                                               # Initial number of grains
+    90         1            2      2.0      0.0      init_num_grains = GS.num_grains
+    91                                               # Percentage of remaining grains to be removed, starts at 99%
+    92         1            1      1.0      0.0      percnt = 0.99
+    93                                           
+    94                                               # Generate global data (Chebyshev, Gauss...)
+    95         1         3960   3960.0      0.0      gr.precalculate_global_data(GS, quad_order=20)
+    96                                           
+    97                                               # Main loop
+    98      3463         7379      2.1      0.0      while True:
+    99      3463        12798      3.7      0.0          print "iter: ", curr_iter
+   100                                                   # Precalculate boundaries and data
+   101      3463    812692086 234678.6     37.9          gr.precalculate_data(GS)
+   102                                           
+   103                                                   # Update graphical elements
+   104      3463         9660      2.8      0.0          if show:
+   105                                                       sim.plot3(GS, BD, elapsed_time, gr.dt, args.show_tj, args.show_ip,
+   106                                                        args.show_tj_ids, args.show_ip_ids, lite=True)
+   107                                           
+   108                                                   # Calculate extinction times for boundaries and filter them
+   109      3463    462919040 133675.7     21.6          times, candidates = gr.calc_extinction_times(GS)
+   110                                           
+   111                                                   # Select candidates for flipping and grain removal
+   112      3463        62304     18.0      0.0          candidates = gr.select_candidates(GS, times, candidates)
+   113                                                   # Flip candidates. If no candidate is given there is no change here
+   114      3463      5419759   1565.0      0.3          banned, ip_banned = gr.flip_candidates(GS, candidates)
+   115                                           
+   116                                                   # Move data
+   117      3463     74032302  21378.1      3.4          gr.move_grains(GS, banned, ip_banned)
+   118                                           
+   119                                                   # Reparametrize data structure
+   120      3463        17421      5.0      0.0          if curr_iter % 10 == 0:
+   121       346         2379      6.9      0.0              print "Reparametrize"
+   122       346    790866992 2285742.8     36.8              gr.reparametrize_all(GS)
+   123                                           
+   124      3463        11310      3.3      0.0          if GS.num_grains <= 0.20 * init_num_grains:
+   125         1            6      6.0      0.0              print "End of simulation"
+   126         1            2      2.0      0.0              break
+   127                                           
+   128                                                   # Update current iteration and current time
+   129      3462         7014      2.0      0.0          curr_iter += 1
+   130      3462        10269      3.0      0.0          elapsed_time += gr.dt
+   131      3462        29782      8.6      0.0          print GS.num_grains, "grains"
